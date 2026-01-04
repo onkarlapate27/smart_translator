@@ -1,8 +1,8 @@
 from dotenv import dotenv_values
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import AIMessage, HumanMessage
 
 # Load .env into a dictionary
 env_vars = dotenv_values(".env")
@@ -19,6 +19,7 @@ llm = ChatOpenAI(
 prompt = ChatPromptTemplate.from_messages(
     [
     ("system", "You are a linguistic expert. Analyze the mood of input text and translate it. OUTPUT ONLY THE TRANSLATED TEXT. DO NOT PROVIDE ANALYSIS OR EXPLANATIONS."),
+    MessagesPlaceholder(variable_name="chat_history"),
     ("human", "Translate this to {language}: {text}")
     ]
 )
@@ -29,11 +30,26 @@ parser = StrOutputParser()
 # LCEL
 chain = prompt | llm | parser
 
-output = chain.invoke({
-    "text": "I am in great mood today. Learning AI is tough and I feel exhausted for that! Also, the weather is lovely.",
-    "language": "Hindi"
-})
 
+# make response retain previous response. Making it stateful
+memory = []
+
+def translate(input_text, target_language):
+
+    output = chain.invoke({
+        "text": input_text,
+        "language": target_language,
+        "chat_history": memory
+    })
+
+    memory.append(HumanMessage(content=input_text))
+    memory.append(AIMessage(content=output))
+
+    return output
 
 if __name__ == "__main__":
-    print(output)
+    # --- Testing the Memory ---
+    print("First Run:", translate("I am feeling bad about tomorrow's Monday tonight.", "Marathi"))
+
+    # Now the AI knows what we talked about previously
+    print("Second Run:", translate("Now make it more formal.", "Marathi"))
